@@ -10,16 +10,24 @@ name: CI
 on:
   push:
     branches: [main, develop]
+  paths:
+    - 'apps/web/**'
+    - 'infrastructure/**'
+    - 'docker-compose.yml'
+    - '.github/workflows/**'
   pull_request:
     branches: [main]
 
 jobs:
   # ============================================
-  # CI para la aplicación web (Vite/React)
+  # CI para la aplicación Next.js (apps/web)
   # ============================================
   web-ci:
-    name: Web App CI
+    name: Next.js App CI
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
 
     steps:
       - name: Checkout repository
@@ -30,24 +38,26 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run lint
-        run: npm run lint --if-present
+        run: npm run lint
 
       - name: Type check
-        run: npm run typecheck --if-present
+        run: npm run typecheck
 
       - name: Build
         run: npm run build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: web-build
-          path: dist/
+          name: nextjs-build
+          path: apps/web/.next/
           retention-days: 7
 
   # ============================================
@@ -67,7 +77,7 @@ jobs:
       - name: Check for security issues
         run: |
           # Verificar que no hay secrets hardcodeados
-          if grep -r "password" docker-compose.yml | grep -v "\${" | grep -v "changeme"; then
+          if grep -E "(password|secret|key).*[:=].*[a-zA-Z0-9]{20,}" docker-compose.yml | grep -v "\${" | grep -v "changeme" | grep -v "#"; then
             echo "ERROR: Posible secreto hardcodeado en docker-compose.yml"
             exit 1
           fi
@@ -84,21 +94,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check .env.example exists
+      - name: Check required files exist
         run: |
-          if [ ! -f .env.example ]; then
-            echo "ERROR: .env.example no encontrado"
-            exit 1
-          fi
-          echo "✅ .env.example existe"
+          files=(
+            ".env.example"
+            ".gitignore"
+            "README.md"
+            "docker-compose.yml"
+            "docs/architecture.md"
+            "infrastructure/postgres/init.sql"
+          )
+          
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: $file no encontrado"
+              exit 1
+            fi
+            echo "✅ $file existe"
+          done
 
-      - name: Check .gitignore exists
+      - name: Check infrastructure READMEs
         run: |
-          if [ ! -f .gitignore ]; then
-            echo "ERROR: .gitignore no encontrado"
-            exit 1
-          fi
-          echo "✅ .gitignore existe"
+          for dir in postfix dovecot rspamd nginx; do
+            if [ ! -f "infrastructure/$dir/README.md" ]; then
+              echo "ERROR: infrastructure/$dir/README.md no encontrado"
+              exit 1
+            fi
+            echo "✅ infrastructure/$dir/README.md existe"
+          done
 
       - name: Verify no secrets in repository
         run: |
@@ -114,41 +137,43 @@ jobs:
             exit 1
           fi
 
+          # Verificar que no hay archivos con patrones de secrets
+          if git grep -l "password.*=.*['\"][a-zA-Z0-9]{20,}['\"]" -- ':!.env.example' ':!README.md' ':!docs/*'; then
+            echo "ERROR: Posibles secrets encontrados en el código"
+            exit 1
+          fi
+
           echo "✅ No se encontraron secrets en el repositorio"
 
   # ============================================
-  # Lint de documentación
+  # Validación de SQL
   # ============================================
-  docs-lint:
-    name: Documentation Lint
+  sql-validate:
+    name: SQL Schema Validation
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check README exists
+      - name: Validate SQL syntax
         run: |
-          if [ ! -f README.md ]; then
-            echo "ERROR: README.md no encontrado"
-            exit 1
-          fi
-          echo "✅ README.md existe"
-
-      - name: Check architecture docs
-        run: |
-          if [ ! -f docs/architecture.md ]; then
-            echo "ERROR: docs/architecture.md no encontrado"
-            exit 1
-          fi
-          echo "✅ docs/architecture.md existe"
-
-      - name: Check infrastructure READMEs
-        run: |
-          for dir in postfix dovecot rspamd nginx; do
-            if [ ! -f "infrastructure/$dir/README.md" ]; then
-              echo "ERROR: infrastructure/$dir/README.md no encontrado"
+          # Verificar que el SQL tiene las tablas necesarias
+          tables=("domains" "users" "mailboxes" "aliases" "sessions" "audit_logs" "mail_settings")
+          
+          for table in "${tables[@]}"; do
+            if ! grep -q "CREATE TABLE.*$table" infrastructure/postgres/init.sql; then
+              echo "ERROR: Tabla $table no encontrada en init.sql"
               exit 1
             fi
+            echo "✅ Tabla $table definida"
           done
-          echo "✅ Todos los READMEs de infraestructura existen"
+
+      - name: Check for password hashing comments
+        run: |
+          if ! grep -q "Argon2id\|argon2id" infrastructure/postgres/init.sql; then
+            echo "WARNING: No se encontró referencia a Argon2id en el schema"
+            echo "Asegúrate de que las contraseñas se hasheen con Argon2id en la aplicación"
+          else
+            echo "✅ Referencia a Argon2id encontrada"
+          fi

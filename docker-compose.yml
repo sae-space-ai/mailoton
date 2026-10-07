@@ -3,13 +3,14 @@
 # ============================================
 # NOTA: Este archivo está preparado para la Fase 1.
 # Los servicios de correo (Postfix, Dovecot) se activarán en Fases posteriores.
-# Por ahora solo incluye servicios de desarrollo y documentación.
 # ============================================
 
 services:
   # ============================================
-  # POSTGRESQL - Base de datos
+  # POSTGRESQL - Base de datos central
   # ============================================
+  # Uso: Almacenamiento de usuarios, dominios, buzones, alias y configuración
+  # Se mantiene porque es la base de datos central del sistema
   postgres:
     image: postgres:16-alpine
     container_name: mailforge_postgres
@@ -20,7 +21,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - mailforge_network
@@ -32,58 +33,54 @@ services:
       retries: 5
 
   # ============================================
-  # REDIS - Cache y rate limiting
+  # REDIS - Cache y rate limiting (Fase 6+)
   # ============================================
-  redis:
-    image: redis:7-alpine
-    container_name: mailforge_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - mailforge_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # TODO: Activar en Fase 6 (Seguridad) para rate limiting
+  # TODO: Activar en Fase 9 (Antispam) para Rspamd
+  # Actualmente no tiene función concreta, se elimina del MVP
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mailforge_redis
+  #   command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_/data
+  #   networks:
+  #     - mailforge_network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   # ============================================
-  # TRAEFIK - Proxy inverso (TLS automático)
+  # TRAEFIK - Proxy inverso (Fase 3+)
   # ============================================
-  traefik:
-    image: traefik:v3.0
-    container_name: mailforge_traefik
-    command:
-      - "--api.insecure=true"
-      - "--api.dashboard=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      # Entrypoints para correo (se activarán en Fase 4-5)
-      # - "--entrypoints.smtp.address=:25"
-      # - "--entrypoints.submission.address=:587"
-      # - "--entrypoints.smtps.address=:465"
-      # - "--entrypoints.imaps.address=:993"
-      # Let's Encrypt (se activará cuando haya dominio)
-      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      # - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
-      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"  # Dashboard de Traefik
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_certs:/letsencrypt
-    networks:
-      - mailforge_network
-    restart: unless-stopped
+  # TODO: Activar en Fase 3 cuando se despliegue en VPS
+  # Actualmente no es necesario: Vercel gestiona el frontend
+  # y los servicios de correo aún no están configurados
+  # traefik:
+  #   image: traefik:v3.0
+  #   container_name: mailforge_traefik
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--api.dashboard=true"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.websecure.address=:443"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #     - "8080:8080"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - traefik_certs:/letsencrypt
+  #   networks:
+  #     - mailforge_network
+  #   restart: unless-stopped
 
   # ============================================
   # POSTFIX - Servidor SMTP (Fase 4)
@@ -98,7 +95,7 @@ services:
   #   volumes:
   #     - ./infrastructure/postfix/main.cf:/etc/postfix/main.cf:ro
   #     - ./infrastructure/postfix/master.cf:/etc/postfix/master.cf:ro
-  #     - mail_data:/var/mail
+  #     - mail_/var/mail
   #   ports:
   #     - "25:25"
   #     - "587:587"
@@ -107,7 +104,6 @@ services:
   #     - mailforge_network
   #   depends_on:
   #     - postgres
-  #     - redis
   #   restart: unless-stopped
 
   # ============================================
@@ -120,7 +116,7 @@ services:
   #   volumes:
   #     - ./infrastructure/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
   #     - ./infrastructure/dovecot/conf.d:/etc/dovecot/conf.d:ro
-  #     - mail_data:/var/mail
+  #     - mail_/var/mail
   #   ports:
   #     - "993:993"
   #     - "143:143"
@@ -141,7 +137,7 @@ services:
   #     - ./infrastructure/rspamd:/etc/rspamd/local.d:ro
   #     - rspamd_cache:/var/lib/rspamd
   #   ports:
-  #     - "11334:11334"  # Web UI
+  #     - "11334:11334"
   #   networks:
   #     - mailforge_network
   #   restart: unless-stopped
@@ -154,37 +150,18 @@ services:
   #   image: clamav/clamav:latest
   #   container_name: mailforge_clamav
   #   volumes:
-  #     - clamav_data:/var/lib/clamav
-  #   networks:
-  #     - mailforge_network
-  #   restart: unless-stopped
-
-  # ============================================
-  # UPTIME KUMA - Monitorización (Fase 10)
-  # ============================================
-  # TODO: Activar en Fase 10
-  # uptime-kuma:
-  #   image: louislam/uptime-kuma:latest
-  #   container_name: mailforge_uptime_kuma
-  #   volumes:
-  #     - uptime_kuma_data:/app/data
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.kuma.rule=Host(`status.${DOMAIN}`)"
-  #     - "traefik.http.routers.kuma.entrypoints=websecure"
-  #     - "traefik.http.routers.kuma.tls.certresolver=letsencrypt"
+  #     - clamav_/var/lib/clamav
   #   networks:
   #     - mailforge_network
   #   restart: unless-stopped
 
 volumes:
-  postgres_data:
-  redis_data:
-  traefik_certs:
-  # mail_data:      # Se activará en Fase 4
-  # rspamd_cache:   # Se activará en Fase 9
-  # clamav_data:    # Se activará en Fase 9
-  # uptime_kuma_data: # Se activará en Fase 10
+  postgres_
+  # redis_         # Se activará en Fase 6/9
+  # traefik_certs: # Se activará en Fase 3
+  # mail_          # Se activará en Fase 4
+  # rspamd_cache:  # Se activará en Fase 9
+  # clamav_        # Se activará en Fase 9
 
 networks:
   mailforge_network:

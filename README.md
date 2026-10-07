@@ -27,8 +27,8 @@ El proyecto utiliza una **arquitectura híbrida**:
 - **Rspamd**: Filtro antispam
 - **ClamAV**: Antivirus para adjuntos
 - **PostgreSQL**: Base de datos para usuarios, dominios y configuración
-- **Redis**: Cache, colas y rate limiting
-- **Traefik**: Proxy inverso con TLS automático
+- **Redis**: Cache, colas y rate limiting (Fase 6+)
+- **Traefik**: Proxy inverso con TLS automático (Fase 3+)
 
 ### Flujo de Correo
 ```
@@ -44,12 +44,14 @@ Usuario → Vercel (Next.js) → API Serverless → PostgreSQL (VPS)
 
 ## 📦 Estado Actual del Desarrollo
 
-### Fase 1 - Estructura y Documentación ✅
-- [x] Estructura de repositorio
-- [x] Documentación de arquitectura
-- [x] Configuración inicial de Next.js
-- [x] Docker Compose base
+### Fase 1 - Estructura y Documentación ✅ COMPLETADA
+- [x] Estructura de repositorio profesional
+- [x] Documentación completa de arquitectura
+- [x] Aplicación Next.js inicializada en `/apps/web`
+- [x] Docker Compose base (PostgreSQL)
 - [x] CI/CD con GitHub Actions
+- [x] Schema de base de datos
+- [x] Landing page del proyecto
 
 ### Fase 2 - Dominio y DNS (Próxima)
 - [ ] Registro de dominio
@@ -58,9 +60,9 @@ Usuario → Vercel (Next.js) → API Serverless → PostgreSQL (VPS)
 
 ### Fase 3 - Infraestructura Base
 - [ ] Provisionar VPS
-- [ ] Docker y Docker Compose
-- [ ] PostgreSQL y Redis
+- [ ] Docker y Docker Compose en VPS
 - [ ] Traefik con TLS
+- [ ] Redis (cuando sea necesario)
 
 ### Fase 4 - SMTP (Postfix)
 - [ ] Configuración de Postfix
@@ -76,7 +78,7 @@ Usuario → Vercel (Next.js) → API Serverless → PostgreSQL (VPS)
 ### Fase 6 - Seguridad
 - [ ] TLS obligatorio
 - [ ] Fail2ban
-- [ ] Rate limiting
+- [ ] Rate limiting (Redis)
 - [ ] Hardening
 
 ### Fase 7 - Webmail
@@ -102,46 +104,102 @@ Usuario → Vercel (Next.js) → API Serverless → PostgreSQL (VPS)
 ## 🚀 Inicio Rápido
 
 ### Requisitos
-- Node.js 18+
-- Docker y Docker Compose
-- Cuenta de Vercel (para deploy)
-- VPS con Docker (para servicios de correo)
+- Node.js 20+
+- Docker y Docker Compose (para servicios de infraestructura)
+- Cuenta de Vercel (para deploy del frontend)
+- VPS con Docker (para servicios de correo, Fase 3+)
 
 ### Desarrollo Local
 
+#### 1. Clonar el repositorio
 ```bash
-# Instalar dependencias
+git clone https://github.com/tu-usuario/mailforge.git
+cd mailforge
+```
+
+#### 2. Configurar variables de entorno
+```bash
+cp .env.example .env
+# Editar .env con valores reales
+```
+
+#### 3. Levantar infraestructura base (PostgreSQL)
+```bash
+docker compose up -d postgres
+```
+
+#### 4. Instalar dependencias del frontend
+```bash
 cd apps/web
 npm install
+```
 
-# Desarrollo
+#### 5. Ejecutar en desarrollo
+```bash
 npm run dev
+```
 
-# Build
+La aplicación estará disponible en `http://localhost:3000`
+
+### Comandos Útiles
+
+```bash
+# Build de producción
+cd apps/web
 npm run build
+
+# Lint
+npm run lint
+
+# Type check
+npm run typecheck
+
+# Iniciar en producción
+npm start
 ```
 
-### Despliegue
+## 📁 Estructura del Repositorio
 
-#### Frontend (Vercel)
-```bash
-# Conectar repositorio en Vercel
-# Configurar variables de entorno
-# Deploy automático en push a main
 ```
-
-#### Backend (VPS)
-```bash
-# Clonar repositorio en VPS
-cd infrastructure
-docker compose up -d
+mailforge/
+├── apps/
+│   └── web/                    # Aplicación Next.js (Frontend principal)
+│       ├── src/
+│       │   ├── app/           # App Router de Next.js
+│       │   ├── components/    # Componentes React
+│       │   └── lib/          # Utilidades
+│       ├── package.json
+│       └── README.md
+│
+├── infrastructure/
+│   ├── postfix/               # Configuración SMTP (Fase 4)
+│   ├── dovecot/               # Configuración IMAP (Fase 5)
+│   ├── rspamd/                # Configuración antispam (Fase 9)
+│   ├── nginx/                 # Configuración proxy alternativo
+│   └── postgres/
+│       └── init.sql          # Schema de base de datos
+│
+├── docs/
+│   └── architecture.md       # Documentación de arquitectura
+│
+├── scripts/                   # Scripts de utilidad (Fases posteriores)
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # Pipeline de CI/CD
+│
+├── src/                       # Landing page del proyecto (Vite)
+├── docker-compose.yml         # Servicios de infraestructura
+├── .env.example              # Plantilla de variables de entorno
+├── .gitignore
+└── README.md
 ```
 
 ## 🔒 Seguridad
 
 - TLS obligatorio en todas las conexiones
 - Contraseñas hasheadas con Argon2id
-- Fail2ban para protección contra fuerza bruta
+- Fail2ban para protección contra fuerza bruta (Fase 6)
 - Rate limiting en API y servicios
 - DKIM, SPF y DMARC para autenticación de correo
 - Secretos gestionados vía variables de entorno (nunca en código)
@@ -149,13 +207,10 @@ docker compose up -d
 ## 📚 Documentación
 
 - [Arquitectura](docs/architecture.md) - Diseño completo del sistema
-- [DNS Setup](docs/dns-setup.md) - Configuración de registros DNS (próximamente)
-- [Deployment](docs/deployment.md) - Guía de despliegue (próximamente)
-- [API Reference](docs/api-reference.md) - Documentación de API (próximamente)
-
-## 📝 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
+- [apps/web](apps/web/README.md) - Documentación del frontend
+- [Postfix](infrastructure/postfix/README.md) - Configuración SMTP
+- [Dovecot](infrastructure/dovecot/README.md) - Configuración IMAP
+- [Rspamd](infrastructure/rspamd/README.md) - Configuración antispam
 
 ## 🤝 Contribuciones
 
@@ -163,7 +218,19 @@ Las contribuciones son bienvenidas. Por favor, abre un issue primero para discut
 
 ## ⚠️ Notas Importantes
 
-- Este proyecto requiere un VPS para los servicios SMTP/IMAP
+- Este proyecto requiere un VPS para los servicios SMTP/IMAP (Fase 3+)
 - La entregabilidad del correo depende de la configuración correcta de DNS y reputación de IP
 - Se recomienda empezar con volúmenes bajos y escalar gradualmente
 - Los backups son críticos y deben configurarse desde el inicio
+
+## 💰 Coste Estimado
+
+### MVP (1-5 cuentas)
+- VPS Hetzner CX22: ~5€/mes
+- Dominio: ~10€/año
+- Todo lo demás: Gratis (Vercel, Cloudflare, Docker)
+- **Total: ~6€/mes**
+
+## 📝 Licencia
+
+Este proyecto es de código abierto y está disponible bajo la licencia MIT.
