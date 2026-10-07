@@ -1,0 +1,154 @@
+# ============================================
+# MAILFORGE - CI Pipeline
+# ============================================
+# Este workflow se ejecuta en cada push y pull request.
+# Verifica: instalación, lint, TypeScript y build.
+# ============================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ============================================
+  # CI para la aplicación web (Vite/React)
+  # ============================================
+  web-ci:
+    name: Web App CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint --if-present
+
+      - name: Type check
+        run: npm run typecheck --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist/
+          retention-days: 7
+
+  # ============================================
+  # Validación de Docker Compose
+  # ============================================
+  docker-validate:
+    name: Docker Compose Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config
+
+      - name: Check for security issues
+        run: |
+          # Verificar que no hay secrets hardcodeados
+          if grep -r "password" docker-compose.yml | grep -v "\${" | grep -v "changeme"; then
+            echo "ERROR: Posible secreto hardcodeado en docker-compose.yml"
+            exit 1
+          fi
+          echo "✅ No se encontraron secrets hardcodeados"
+
+  # ============================================
+  # Validación de archivos de infraestructura
+  # ============================================
+  infra-validate:
+    name: Infrastructure Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check .env.example exists
+        run: |
+          if [ ! -f .env.example ]; then
+            echo "ERROR: .env.example no encontrado"
+            exit 1
+          fi
+          echo "✅ .env.example existe"
+
+      - name: Check .gitignore exists
+        run: |
+          if [ ! -f .gitignore ]; then
+            echo "ERROR: .gitignore no encontrado"
+            exit 1
+          fi
+          echo "✅ .gitignore existe"
+
+      - name: Verify no secrets in repository
+        run: |
+          # Verificar que .env no está commiteado
+          if git ls-files | grep -q "^\.env$"; then
+            echo "ERROR: .env está commiteado al repositorio"
+            exit 1
+          fi
+
+          # Verificar que no hay claves privadas
+          if git ls-files | grep -qE "\.(key|pem|p12)$"; then
+            echo "ERROR: Claves privadas encontradas en el repositorio"
+            exit 1
+          fi
+
+          echo "✅ No se encontraron secrets en el repositorio"
+
+  # ============================================
+  # Lint de documentación
+  # ============================================
+  docs-lint:
+    name: Documentation Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check README exists
+        run: |
+          if [ ! -f README.md ]; then
+            echo "ERROR: README.md no encontrado"
+            exit 1
+          fi
+          echo "✅ README.md existe"
+
+      - name: Check architecture docs
+        run: |
+          if [ ! -f docs/architecture.md ]; then
+            echo "ERROR: docs/architecture.md no encontrado"
+            exit 1
+          fi
+          echo "✅ docs/architecture.md existe"
+
+      - name: Check infrastructure READMEs
+        run: |
+          for dir in postfix dovecot rspamd nginx; do
+            if [ ! -f "infrastructure/$dir/README.md" ]; then
+              echo "ERROR: infrastructure/$dir/README.md no encontrado"
+              exit 1
+            fi
+          done
+          echo "✅ Todos los READMEs de infraestructura existen"
