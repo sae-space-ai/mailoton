@@ -88,3 +88,6 @@ clamav_db/
 
 # Rspamd cache
 rspamd_cache/
+
+# Lock files - mantener el de la raíz (npm workspaces)
+# apps/web/package-lock.json no existe porque usamos workspaces

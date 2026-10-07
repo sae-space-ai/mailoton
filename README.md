@@ -47,11 +47,11 @@ Usuario → Vercel (Next.js) → API Serverless → PostgreSQL (VPS)
 ### Fase 1 - Estructura y Documentación ✅ COMPLETADA
 - [x] Estructura de repositorio profesional
 - [x] Documentación completa de arquitectura
-- [x] Aplicación Next.js inicializada en `/apps/web`
+- [x] Aplicación Next.js funcional en `/apps/web`
 - [x] Docker Compose base (PostgreSQL)
 - [x] CI/CD con GitHub Actions
 - [x] Schema de base de datos
-- [x] Landing page del proyecto
+- [x] Build, lint y typecheck validados
 
 ### Fase 2 - Dominio y DNS (Próxima)
 - [ ] Registro de dominio
@@ -128,9 +128,8 @@ cp .env.example .env
 docker compose up -d postgres
 ```
 
-#### 4. Instalar dependencias del frontend
+#### 4. Instalar dependencias
 ```bash
-cd apps/web
 npm install
 ```
 
@@ -145,7 +144,6 @@ La aplicación estará disponible en `http://localhost:3000`
 
 ```bash
 # Build de producción
-cd apps/web
 npm run build
 
 # Lint
@@ -155,7 +153,7 @@ npm run lint
 npm run typecheck
 
 # Iniciar en producción
-npm start
+npm run start
 ```
 
 ## 📁 Estructura del Repositorio
@@ -188,7 +186,6 @@ mailforge/
 │   └── workflows/
 │       └── ci.yml            # Pipeline de CI/CD
 │
-├── src/                       # Landing page del proyecto (Vite)
 ├── docker-compose.yml         # Servicios de infraestructura
 ├── .env.example              # Plantilla de variables de entorno
 ├── .gitignore

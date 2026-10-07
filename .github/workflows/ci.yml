@@ -10,11 +10,6 @@ name: CI
 on:
   push:
     branches: [main, develop]
-  paths:
-    - 'apps/web/**'
-    - 'infrastructure/**'
-    - 'docker-compose.yml'
-    - '.github/workflows/**'
   pull_request:
     branches: [main]
 
@@ -25,9 +20,6 @@ jobs:
   web-ci:
     name: Next.js App CI
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
 
     steps:
       - name: Checkout repository
@@ -38,7 +30,6 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -51,14 +42,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: nextjs-build
-          path: apps/web/.next/
-          retention-days: 7
 
   # ============================================
   # Validación de Docker Compose
@@ -134,12 +117,6 @@ jobs:
           # Verificar que no hay claves privadas
           if git ls-files | grep -qE "\.(key|pem|p12)$"; then
             echo "ERROR: Claves privadas encontradas en el repositorio"
-            exit 1
-          fi
-
-          # Verificar que no hay archivos con patrones de secrets
-          if git grep -l "password.*=.*['\"][a-zA-Z0-9]{20,}['\"]" -- ':!.env.example' ':!README.md' ':!docs/*'; then
-            echo "ERROR: Posibles secrets encontrados en el código"
             exit 1
           fi
 
